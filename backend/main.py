@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import asyncio
 import logging
 from .database import get_db, engine
-from .models import Base, RiskConfig, RiskConfigUpdate, AppStatus
+from .models import Base, RiskConfig, RiskConfigUpdate, AppStatus, SymbolRisk, SymbolRiskUpdate
 from .config import config
 from .kite_session import kite_mgr
 from .position_manager import pos_mgr
@@ -52,7 +52,8 @@ async def startup_event():
             check_interval=config.CHECK_INTERVAL_SECONDS,
             trailing_sl_enabled=False,
             trail_distance=0.0,
-            peak_pnl=0.0
+            peak_pnl=0.0,
+            auto_exit_time="15:15"
         )
         db.add(new_config)
 
@@ -123,11 +124,19 @@ def update_risk_config(conf_update: RiskConfigUpdate, db: Session = Depends(get_
     conf.check_interval = conf_update.check_interval
     conf.trailing_sl_enabled = conf_update.trailing_sl_enabled
     conf.trail_distance = conf_update.trail_distance
-    # Reset peak_pnl when config is updated manually?
-    # Let's reset it to current PnL if trailing is newly enabled
+    conf.auto_exit_time = conf_update.auto_exit_time
+
+    # Reset peak_pnl when config is updated manually
     if conf.trailing_sl_enabled:
         breakdown = pos_mgr.get_pnl_breakdown()
-        conf.peak_pnl = max(conf.peak_pnl, breakdown["total_pnl"])
+        current_pnl = breakdown["total_pnl"]
+        conf.peak_pnl = max(conf.peak_pnl, current_pnl)
+
+        # Update max_loss immediately based on current peak
+        new_max_loss = conf.peak_pnl - conf.trail_distance
+        if new_max_loss > conf.max_loss:
+            conf.max_loss = new_max_loss
+            logger.info(f"Trailing SL Updated: New Max Loss set to {conf.max_loss}")
 
     db.commit()
     return conf
@@ -142,6 +151,22 @@ async def manual_squareoff():
 async def get_app_status_api():
     status = await risk_monitor.get_app_status()
     return {"status": status}
+
+@app.get("/config/symbols")
+def get_all_symbol_risks(db: Session = Depends(get_db)):
+    return db.query(SymbolRisk).all()
+
+@app.post("/config/symbols")
+def update_symbol_risk(risk_update: SymbolRiskUpdate, db: Session = Depends(get_db)):
+    risk = db.query(SymbolRisk).filter(SymbolRisk.tradingsymbol == risk_update.tradingsymbol).first()
+    if not risk:
+        risk = SymbolRisk(tradingsymbol=risk_update.tradingsymbol)
+        db.add(risk)
+
+    risk.stop_loss = risk_update.stop_loss
+    risk.target = risk_update.target
+    db.commit()
+    return risk
 
 @app.post("/status/resume")
 async def resume_monitoring():
@@ -165,10 +190,25 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             breakdown = pos_mgr.get_pnl_breakdown()
             status = await risk_monitor.get_app_status()
+
+            db = next(get_db())
+            conf = db.query(RiskConfig).first()
+            symbol_risks = db.query(SymbolRisk).all()
+            symbol_risks_dict = {r.tradingsymbol: {"sl": r.stop_loss, "target": r.target} for r in symbol_risks}
+            db.close()
+
             await websocket.send_json({
                 "pnl": breakdown,
                 "status": status,
-                "positions": pos_mgr.get_all_positions_list()
+                "positions": pos_mgr.get_all_positions_list(),
+                "config": {
+                    "max_loss": conf.max_loss,
+                    "profit_target": conf.profit_target,
+                    "trailing_sl_enabled": conf.trailing_sl_enabled,
+                    "trail_distance": conf.trail_distance,
+                    "auto_exit_time": conf.auto_exit_time
+                },
+                "symbol_risks": symbol_risks_dict
             })
             await asyncio.sleep(1)
     except WebSocketDisconnect:

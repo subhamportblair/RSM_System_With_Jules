@@ -7,7 +7,15 @@ async def test_risk_trigger_max_loss():
     rm = RiskMonitor()
     rm.get_app_status = AsyncMock(return_value="ACTIVE")
     rm.set_app_status = AsyncMock()
-    rm.get_config = AsyncMock(return_value=MagicMock(max_loss=-5000, profit_target=10000, check_interval=3))
+
+    mock_config = MagicMock()
+    mock_config.max_loss = -5000
+    mock_config.profit_target = 10000
+    mock_config.check_interval = 3
+    mock_config.auto_exit_time = "15:15"
+    mock_config.trailing_sl_enabled = False
+
+    rm.get_config = AsyncMock(return_value=mock_config)
 
     mock_breakdown = {
         "total_pnl": -6000,
@@ -20,17 +28,18 @@ async def test_risk_trigger_max_loss():
     with patch("backend.risk_monitor.pos_mgr") as mock_pos_mgr, \
          patch("backend.risk_monitor.square_off_all_fo", new_callable=AsyncMock) as mock_sq, \
          patch("backend.risk_monitor.telegram", new_callable=AsyncMock) as mock_tg, \
-         patch("backend.risk_monitor.ticker_mgr") as mock_ticker:
+         patch("backend.risk_monitor.ticker_mgr") as mock_ticker, \
+         patch("backend.risk_monitor.SessionLocal") as mock_session_local:
+
+        mock_db = MagicMock()
+        mock_session_local.return_value = mock_db
+        # Mock both first() and all() for DB queries
+        mock_db.query.return_value.first.return_value = mock_config
+        mock_db.query.return_value.all.return_value = []
 
         mock_pos_mgr.fetch_and_filter_positions = AsyncMock(return_value=[])
         mock_pos_mgr.get_pnl_breakdown.return_value = mock_breakdown
         mock_sq.return_value = []
-
-        # We need to stop the loop after one iteration or mock the whole check_risk_loop logic
-        # For simplicity, let's just test the logic inside the loop if we can
-
-        # Since check_risk_loop is a while True, let's test the breach logic separately if possible
-        # or just run it once.
 
         # Actually, let's mock the loop to run once
         rm.is_running = True
@@ -72,4 +81,3 @@ async def test_trailing_sl_logic():
         await rm.update_peak_pnl_and_sl(7000.0)
         assert mock_config.peak_pnl == 8000.0
         assert mock_config.max_loss == 6000.0
-        # commit is called only if current_pnl > peak_pnl in our implementation

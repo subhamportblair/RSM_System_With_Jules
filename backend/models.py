@@ -20,6 +20,14 @@ class RiskConfig(Base):
     trailing_sl_enabled = Column(Boolean, default=False)
     trail_distance = Column(Float, default=0.0)
     peak_pnl = Column(Float, default=0.0)
+    auto_exit_time = Column(String, default="15:15")
+
+class SymbolRisk(Base):
+    __tablename__ = "symbol_risks"
+    id = Column(Integer, primary_key=True, index=True)
+    tradingsymbol = Column(String, unique=True, index=True)
+    stop_loss = Column(Float, nullable=True)
+    target = Column(Float, nullable=True)
 
 class AppStatus(Base):
     __tablename__ = "app_status"
@@ -34,6 +42,12 @@ class RiskConfigUpdate(BaseModel):
     check_interval: int
     trailing_sl_enabled: bool
     trail_distance: float
+    auto_exit_time: str
+
+class SymbolRiskUpdate(BaseModel):
+    tradingsymbol: str
+    stop_loss: Optional[float]
+    target: Optional[float]
 
 class PnLSummary(BaseModel):
     day_pnl: float

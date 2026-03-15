@@ -1,10 +1,10 @@
 import asyncio
 import logging
 from .position_manager import pos_mgr
-from .squareoff_engine import square_off_all_fo
+from .squareoff_engine import square_off_all_fo, square_off_position
 from .telegram_notifier import telegram
 from .database import SessionLocal
-from .models import RiskConfig, AppStatus
+from .models import RiskConfig, AppStatus, SymbolRisk
 from .ticker_manager import ticker_mgr
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,12 @@ class RiskMonitor:
 
         await telegram.send(msg)
 
+    async def get_symbol_risks(self):
+        db = SessionLocal()
+        risks = {r.tradingsymbol: r for r in db.query(SymbolRisk).all()}
+        db.close()
+        return risks
+
     async def check_risk_loop(self):
         self.is_running = True
         while self.is_running:
@@ -92,6 +98,24 @@ class RiskMonitor:
                 if status == "HALTED":
                     await asyncio.sleep(5)
                     continue
+
+                config = await self.get_config()
+                if not config:
+                    await asyncio.sleep(3)
+                    continue
+
+                # Time Based Exit
+                now = datetime.now()
+                current_time_str = now.strftime("%H:%M")
+                if current_time_str >= config.auto_exit_time:
+                    # Check if there are any MIS positions open
+                    positions = await pos_mgr.fetch_and_filter_positions()
+                    mis_positions = [p for p in positions if p["product"] == "MIS" and p["quantity"] != 0]
+                    if mis_positions:
+                        logger.info(f"Time-based exit triggered at {current_time_str} (Target: {config.auto_exit_time})")
+                        for p in mis_positions:
+                            await square_off_position(p)
+                        await telegram.send(f"🕒 <b>AUTO EXIT TIME REACHED</b>\nAll MIS positions squared off at {current_time_str}.")
 
                 # Refresh positions from Kite occasionally
                 positions = await pos_mgr.fetch_and_filter_positions()
@@ -106,10 +130,19 @@ class RiskMonitor:
                 # Update Trailing SL if enabled
                 await self.update_peak_pnl_and_sl(day_pnl)
 
-                config = await self.get_config()
-                if not config:
-                    await asyncio.sleep(3)
-                    continue
+                # Per-Symbol Risk Check
+                symbol_risks = await self.get_symbol_risks()
+                for p in positions:
+                    if p["quantity"] == 0: continue
+                    pnl = (p["last_price"] - p["average_price"]) * p["quantity"] + p["realised"]
+                    risk = symbol_risks.get(p["tradingsymbol"])
+                    if risk:
+                        if risk.stop_loss is not None and pnl <= risk.stop_loss:
+                            await square_off_position(p)
+                            await telegram.send(f"⚠️ <b>SYMBOL SL HIT</b>\n{p['tradingsymbol']} closed at ₹{pnl:,.2f} (SL: ₹{risk.stop_loss})")
+                        elif risk.target is not None and pnl >= risk.target:
+                            await square_off_position(p)
+                            await telegram.send(f"✅ <b>SYMBOL TARGET HIT</b>\n{p['tradingsymbol']} closed at ₹{pnl:,.2f} (Target: ₹{risk.target})")
 
                 if day_pnl <= config.max_loss:
                     await self.set_app_status("HALTED")

@@ -12,6 +12,7 @@ async function fetchConfig() {
     document.getElementById('auto-squareoff-input').checked = riskConfig.auto_squareoff;
     document.getElementById('trailing-sl-enabled').checked = riskConfig.trailing_sl_enabled;
     document.getElementById('trail-distance-input').value = riskConfig.trail_distance;
+    document.getElementById('auto-exit-time-input').value = riskConfig.auto_exit_time;
 
     document.getElementById('max-loss-label').innerText = `Max Loss: ₹${riskConfig.max_loss.toLocaleString()}`;
     document.getElementById('profit-target-label').innerText = `Target: ₹${riskConfig.profit_target.toLocaleString()}`;
@@ -24,7 +25,8 @@ async function saveConfig() {
         auto_squareoff: document.getElementById('auto-squareoff-input').checked,
         check_interval: riskConfig.check_interval || 3,
         trailing_sl_enabled: document.getElementById('trailing-sl-enabled').checked,
-        trail_distance: parseFloat(document.getElementById('trail-distance-input').value)
+        trail_distance: parseFloat(document.getElementById('trail-distance-input').value),
+        auto_exit_time: document.getElementById('auto-exit-time-input').value
     };
 
     await fetch(`${API_BASE}/config`, {
@@ -41,6 +43,11 @@ function connectWebSocket() {
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        if (data.config) {
+            riskConfig = data.config;
+            document.getElementById('max-loss-label').innerText = `Max Loss: ₹${riskConfig.max_loss.toLocaleString()}`;
+            document.getElementById('profit-target-label').innerText = `Target: ₹${riskConfig.profit_target.toLocaleString()}`;
+        }
         updateDashboard(data);
     };
 
@@ -49,8 +56,11 @@ function connectWebSocket() {
     };
 }
 
+let currentSymbolRisks = {};
+
 function updateDashboard(data) {
-    const { pnl, status, positions } = data;
+    const { pnl, status, positions, symbol_risks } = data;
+    currentSymbolRisks = symbol_risks || {};
 
     // Status
     const statusEl = document.getElementById('app-status');
@@ -106,7 +116,7 @@ function updateTables(positions) {
     };
 
     positions.forEach(p => {
-        const isOpt = p.tradingsymbol.endsWith("CE") || p.tradingsymbol.endsWith("PE");
+        const isOpt = p.tradingsymbol.endswith ? p.tradingsymbol.endsWith("CE") || p.tradingsymbol.endsWith("PE") : (p.tradingsymbol.slice(-2) === "CE" || p.tradingsymbol.slice(-2) === "PE");
         const type = isOpt ? 'options' : 'futures';
         const product = p.product.toLowerCase();
         const key = `${type}-${product}`;
@@ -119,7 +129,9 @@ function updateTables(positions) {
 
         tbody.innerHTML = groups[key].map(p => {
             const pnl = (p.last_price - p.average_price) * p.quantity + p.realised;
-            const type = p.tradingsymbol.endsWith("CE") ? "CE" : (p.tradingsymbol.endsWith("PE") ? "PE" : "FUT");
+            const type = (p.tradingsymbol.slice(-2) === "CE") ? "CE" : ((p.tradingsymbol.slice(-2) === "PE") ? "PE" : "FUT");
+            const risk = currentSymbolRisks[p.tradingsymbol] || { sl: '', target: '' };
+
             return `
                 <tr>
                     <td>${p.tradingsymbol}</td>
@@ -129,9 +141,30 @@ function updateTables(positions) {
                     <td>${p.average_price.toFixed(2)}</td>
                     <td>${p.last_price.toFixed(2)}</td>
                     <td class="${pnl >= 0 ? 'profit' : 'loss'}">${pnl.toFixed(2)}</td>
+                    <td>
+                        <input type="number" placeholder="SL" value="${risk.sl || ''}"
+                            onchange="updateSymbolRisk('${p.tradingsymbol}', this.value, null)" style="width: 60px">
+                        <input type="number" placeholder="Tgt" value="${risk.target || ''}"
+                            onchange="updateSymbolRisk('${p.tradingsymbol}', null, this.value)" style="width: 60px">
+                    </td>
                 </tr>
             `;
         }).join('');
+    });
+}
+
+async function updateSymbolRisk(symbol, sl, target) {
+    const existing = currentSymbolRisks[symbol] || { sl: null, target: null };
+    const payload = {
+        tradingsymbol: symbol,
+        stop_loss: sl !== null ? (sl === '' ? null : parseFloat(sl)) : existing.sl,
+        target: target !== null ? (target === '' ? null : parseFloat(target)) : existing.target
+    };
+
+    await fetch(`${API_BASE}/config/symbols`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
     });
 }
 

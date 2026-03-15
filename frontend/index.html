@@ -75,6 +75,10 @@
                     <label>Trail Distance (₹)</label>
                     <input type="number" id="trail-distance-input" value="1000">
                 </div>
+                <div class="form-group">
+                    <label>Auto MIS Exit Time (HH:MM)</label>
+                    <input type="text" id="auto-exit-time-input" value="15:15">
+                </div>
                 <button id="save-config" class="btn-primary">Save Configuration</button>
             </div>
         </section>
@@ -105,6 +109,7 @@
                             <th>Avg</th>
                             <th>LTP</th>
                             <th>PnL</th>
+                            <th>SL / Target</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -113,19 +118,19 @@
             <!-- Other tab contents will be managed by JS -->
             <div id="options-nrml" class="tab-content">
                 <table id="table-options-nrml">
-                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th></tr></thead>
+                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th><th>SL / Target</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
             <div id="futures-mis" class="tab-content">
                 <table id="table-futures-mis">
-                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th></tr></thead>
+                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th><th>SL / Target</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
             <div id="futures-nrml" class="tab-content">
                 <table id="table-futures-nrml">
-                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th></tr></thead>
+                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th><th>SL / Target</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
