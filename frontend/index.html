@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F&O Risk Management System (NFO + BFO)</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>F&O RMS (NFO + BFO)</h1>
+            <div id="app-status" class="badge">Status: Loading...</div>
+            <div id="system-date"></div>
+        </div>
+    </header>
+
+    <main>
+        <section class="summary-cards">
+            <div class="card pnl-card">
+                <h3>Combined Day PnL</h3>
+                <div id="total-pnl" class="pnl-value">₹ 0.00</div>
+                <div class="pnl-sub">
+                    <span>Realized: <span id="realized-pnl">₹ 0.00</span></span>
+                    <span>Unrealized: <span id="unrealized-pnl">₹ 0.00</span></span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-labels">
+                        <span id="max-loss-label">Max Loss: ₹ 0</span>
+                        <span id="profit-target-label">Target: ₹ 0</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div id="pnl-progress" class="progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card breakdown-card">
+                <h3>Breakdown by Type</h3>
+                <div class="pills" id="type-breakdown">
+                    <div class="pill ce-pill">CE: ₹ 0.00</div>
+                    <div class="pill pe-pill">PE: ₹ 0.00</div>
+                    <div class="pill fut-pill">FUT: ₹ 0.00</div>
+                </div>
+                <h3>Breakdown by Exchange</h3>
+                <div class="pills" id="exchange-breakdown">
+                    <div class="pill nfo-pill">NFO: ₹ 0.00</div>
+                    <div class="pill bfo-pill">BFO: ₹ 0.00</div>
+                </div>
+            </div>
+
+            <div class="card config-card">
+                <h3>Risk Configuration</h3>
+                <div class="form-group">
+                    <label>Max Loss (₹)</label>
+                    <input type="number" id="max-loss-input" value="-5000">
+                </div>
+                <div class="form-group">
+                    <label>Profit Target (₹)</label>
+                    <input type="number" id="profit-target-input" value="10000">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="auto-squareoff-input" checked> Auto Square-off
+                    </label>
+                </div>
+                <hr>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="trailing-sl-enabled"> Enable Trailing SL
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Trail Distance (₹)</label>
+                    <input type="number" id="trail-distance-input" value="1000">
+                </div>
+                <button id="save-config" class="btn-primary">Save Configuration</button>
+            </div>
+        </section>
+
+        <section class="actions">
+            <button id="square-off-all" class="btn-danger">🔴 Square Off All F&O</button>
+            <button id="pause-resume" class="btn-secondary">⏸ Pause Monitoring</button>
+            <button id="test-telegram" class="btn-secondary">📩 Test Telegram</button>
+            <button id="login-kite" class="btn-secondary">🔑 Login Kite</button>
+        </section>
+
+        <section class="positions-section">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab('options-mis')">Options MIS</button>
+                <button class="tab-btn" onclick="showTab('options-nrml')">Options NRML</button>
+                <button class="tab-btn" onclick="showTab('futures-mis')">Futures MIS</button>
+                <button class="tab-btn" onclick="showTab('futures-nrml')">Futures NRML</button>
+            </div>
+
+            <div id="options-mis" class="tab-content active">
+                <table id="table-options-mis">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Exchange</th>
+                            <th>Type</th>
+                            <th>Qty</th>
+                            <th>Avg</th>
+                            <th>LTP</th>
+                            <th>PnL</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <!-- Other tab contents will be managed by JS -->
+            <div id="options-nrml" class="tab-content">
+                <table id="table-options-nrml">
+                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="futures-mis" class="tab-content">
+                <table id="table-futures-mis">
+                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="futures-nrml" class="tab-content">
+                <table id="table-futures-nrml">
+                    <thead><tr><th>Symbol</th><th>Exchange</th><th>Type</th><th>Qty</th><th>Avg</th><th>LTP</th><th>PnL</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

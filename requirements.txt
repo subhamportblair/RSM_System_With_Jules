@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+kiteconnect
+sqlalchemy
+databases[sqlite]
+python-dotenv
+httpx
+jinja2
+python-multipart
+websockets
+pytest
+pytest-asyncio
