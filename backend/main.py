@@ -18,6 +18,7 @@ from .ticker_manager import ticker_mgr
 # Initialize Database
 Base.metadata.create_all(bind=engine)
 
+# RMS Version 2.0.0
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
